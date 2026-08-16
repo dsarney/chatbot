@@ -3,8 +3,6 @@
   {% if message.role == "assistant" %}
   <div class="avatar" aria-hidden="true">A</div>
   {% endif %}
-  <div class="bubble-body">
-    {{ message.content | format_message | safe }}
-  </div>
+  <div class="bubble-body">{{ message.content | format_message | safe }}</div>
 </article>
 {% endfor %}

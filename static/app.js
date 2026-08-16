@@ -28,7 +28,9 @@ function setGenerating(on) {
 function setError(message) {
   const banner = document.getElementById("error-banner");
   if (!banner) return;
-  banner.innerHTML = message ? `<p class="error">${escapeHtml(message)}</p>` : "";
+  banner.innerHTML = message
+    ? `<p class="error">${escapeHtml(message)}</p>`
+    : "";
 }
 
 function appendUserBubble(text) {
@@ -62,11 +64,14 @@ function updateThreadTitle(threadId, title) {
   const input = thread?.querySelector(".thread-rename input");
   if (input) input.value = title;
   const mobile = document.querySelector(".mobile-title");
-  if (mobile && thread?.classList.contains("is-active")) mobile.textContent = title;
+  if (mobile && thread?.classList.contains("is-active"))
+    mobile.textContent = title;
 }
 
 function startRename(thread) {
-  document.querySelectorAll(".thread.is-editing").forEach((el) => el.classList.remove("is-editing"));
+  document
+    .querySelectorAll(".thread.is-editing")
+    .forEach((el) => el.classList.remove("is-editing"));
   thread.classList.add("is-editing");
   clearRenameError(thread);
   const input = thread.querySelector(".thread-rename input");
@@ -201,13 +206,16 @@ async function sendChat(text) {
           if (!bodyEl) bodyEl = appendAssistantBubble();
           bodyEl.classList.remove("is-streaming");
           bodyEl.innerHTML = event.html;
-          if (event.thread_id && event.title) updateThreadTitle(event.thread_id, event.title);
+          if (event.thread_id && event.title)
+            updateThreadTitle(event.thread_id, event.title);
         }
       }
     }
   } catch (error) {
     if (error.name !== "AbortError" && !generationStopped) {
-      setError("The assistant could not reply. Check your API key and try again.");
+      setError(
+        "The assistant could not reply. Check your API key and try again.",
+      );
       bodyEl?.closest("article")?.remove();
     }
   } finally {
@@ -282,7 +290,7 @@ document.addEventListener(
       sendChat(text);
     }
   },
-  true
+  true,
 );
 
 document.addEventListener("htmx:afterRequest", () => {

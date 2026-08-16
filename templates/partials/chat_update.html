@@ -2,8 +2,7 @@
 <div id="error-banner" hx-swap-oob="innerHTML">
   {% include "partials/error.html" %}
 </div>
-{% set sidebar_oob = true %}
-{% include "partials/sidebar.html" %}
+{% set sidebar_oob = true %} {% include "partials/sidebar.html" %}
 <div
   id="empty-state"
   hx-swap-oob="outerHTML"
@@ -12,7 +11,8 @@
   <p class="eyebrow">Assistant</p>
   <h1>What do you want to work through?</h1>
   <p class="lede">
-    Multi-turn chat, remembered for this session. Ask something, or start with a prompt.
+    Multi-turn chat, remembered for this session. Ask something, or start with a
+    prompt.
   </p>
   <div class="starters">
     {% for prompt in starters %}

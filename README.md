@@ -2,6 +2,13 @@
 
 A small OpenAI chat app with a FastAPI UI. Conversations are multi-turn and stored in memory for the browser session (they reset when the server restarts).
 
+## Clone
+
+```bash
+git clone https://github.com/dsarney/chatbot.git
+cd chatbot
+```
+
 ## Setup
 
 ```bash

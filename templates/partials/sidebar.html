@@ -1,4 +1,15 @@
-<aside id="sidebar" class="sidebar"{% if sidebar_oob %} hx-swap-oob="outerHTML"{% endif %}>
+<aside
+  id="sidebar"
+  class="sidebar"
+  {%
+  if
+  sidebar_oob
+  %}
+  hx-swap-oob="outerHTML"
+  {%
+  endif
+  %}
+>
   <div class="brand">
     <div>
       <p class="brand-name">Chatbot</p>
@@ -19,8 +30,15 @@
 
   <nav class="thread-list" aria-label="Chats">
     {% for item in threads %}
-    <div class="thread{% if item.id == thread.id %} is-active{% endif %}" data-thread-id="{{ item.id }}">
-      <form method="post" action="/threads/{{ item.id }}/select" class="thread-select">
+    <div
+      class="thread{% if item.id == thread.id %} is-active{% endif %}"
+      data-thread-id="{{ item.id }}"
+    >
+      <form
+        method="post"
+        action="/threads/{{ item.id }}/select"
+        class="thread-select"
+      >
         <button
           type="submit"
           hx-post="/threads/{{ item.id }}/select"
@@ -30,7 +48,11 @@
           {{ item.title }}
         </button>
       </form>
-      <form method="post" action="/threads/{{ item.id }}/rename" class="thread-rename">
+      <form
+        method="post"
+        action="/threads/{{ item.id }}/rename"
+        class="thread-rename"
+      >
         <label class="sr-only" for="rename-{{ item.id }}">Rename chat</label>
         <input
           id="rename-{{ item.id }}"
@@ -43,7 +65,13 @@
       </form>
       <div class="thread-actions">
         <button type="button" class="thread-edit" aria-label="Rename chat">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            width="14"
+            height="14"
+            fill="none"
+            aria-hidden="true"
+          >
             <path
               d="M4 20h4l10.5-10.5-4-4L4 16v4zM14.5 5.5l4 4"
               stroke="currentColor"
@@ -53,7 +81,11 @@
             />
           </svg>
         </button>
-        <form method="post" action="/threads/{{ item.id }}/delete" class="thread-delete">
+        <form
+          method="post"
+          action="/threads/{{ item.id }}/delete"
+          class="thread-delete"
+        >
           <button
             type="submit"
             aria-label="Delete chat"
@@ -61,7 +93,13 @@
             hx-target="body"
             hx-swap="outerHTML"
           >
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              width="14"
+              height="14"
+              fill="none"
+              aria-hidden="true"
+            >
               <path
                 d="M6 6l12 12M18 6L6 18"
                 stroke="currentColor"
