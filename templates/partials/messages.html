@@ -3,6 +3,39 @@
   {% if message.role == "assistant" %}
   <div class="avatar" aria-hidden="true">A</div>
   {% endif %}
-  <div class="bubble-body">{{ message.content | format_message | safe }}</div>
+  <div class="bubble-body">
+    {% if message.role == "assistant" %} {{ message.content | format_message |
+    safe }} {% else %} {% if message.content %}
+    <p>{{ message.content | e | replace('\n', '<br />') | safe }}</p>
+    {% endif %} {% if message.attachments %}
+    <div class="attachments">
+      {% for attachment in message.attachments %} {% if attachment.kind ==
+      "image" %}
+      <a
+        class="attachment-image"
+        href="/attachments/{{ attachment.id }}"
+        target="_blank"
+        rel="noopener"
+      >
+        <img
+          class="attachment-thumb"
+          src="/attachments/{{ attachment.id }}"
+          alt="{{ attachment.name | e }}"
+          loading="lazy"
+        />
+      </a>
+      {% else %}
+      <a
+        class="attachment-doc"
+        href="/attachments/{{ attachment.id }}"
+        download
+      >
+        <span class="attachment-doc-icon" aria-hidden="true">DOC</span>
+        <span class="attachment-doc-name">{{ attachment.name | e }}</span>
+      </a>
+      {% endif %} {% endfor %}
+    </div>
+    {% endif %} {% endif %}
+  </div>
 </article>
 {% endfor %}

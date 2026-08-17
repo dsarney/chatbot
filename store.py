@@ -23,7 +23,7 @@ class Thread:
     title: str = "New chat"
     # When True, skip auto-titling from the first user message.
     manual_title: bool = False
-    messages: list[dict[str, str]] = field(default_factory=list)
+    messages: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -141,18 +141,29 @@ def delete_thread(session_id: str, thread_id: str) -> Thread:
         return state.threads[state.current_id]
 
 
-def append_user_message(session_id: str, content: str) -> Thread:
+def append_user_message(
+    session_id: str,
+    content: str,
+    attachments: list[dict] | None = None,
+) -> Thread:
     """Append a user message and auto-title from it if the thread is still untitled.
 
     Re-inserts the thread at the end of the dict so it sorts as most recent.
     """
     thread = current_thread(session_id)
     state = get_or_create_session(session_id)
+    attachment_list = attachments or []
     with _lock:
         if not thread.messages and not thread.manual_title:
-            title = content.strip().replace("\n", " ")
-            thread.title = unique_title(state, title, exclude_id=thread.id)
-        thread.messages.append({"role": "user", "content": content})
+            title_source = content.strip().replace("\n", " ")
+            if not title_source and attachment_list:
+                title_source = attachment_list[0].get("name", "New chat")
+            if title_source:
+                thread.title = unique_title(state, title_source, exclude_id=thread.id)
+        message: dict = {"role": "user", "content": content}
+        if attachment_list:
+            message["attachments"] = attachment_list
+        thread.messages.append(message)
         # Pop + reinsert so this thread is last in insertion order (newest).
         state.threads.pop(thread.id)
         state.threads[thread.id] = thread

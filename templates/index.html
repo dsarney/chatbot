@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
     <title>Chatbot</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -10,9 +13,9 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/static/styles.css?v=6" />
+    <link rel="stylesheet" href="/static/styles.css?v=8" />
     <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
-    <script src="/static/app.js?v=6" defer></script>
+    <script src="/static/app.js?v=8" defer></script>
   </head>
   <body>
     <div class="app">
@@ -24,6 +27,8 @@
             class="icon-btn"
             id="sidebar-toggle"
             aria-label="Open chats"
+            aria-controls="sidebar"
+            aria-expanded="false"
           >
             <span></span><span></span><span></span>
           </button>
@@ -67,14 +72,50 @@
 
         <footer class="composer-wrap">
           <div id="error-banner">{% include "partials/error.html" %}</div>
-          <form id="composer" class="composer" method="post" action="/chat">
+          <div id="attachment-preview" class="attachment-preview" hidden></div>
+          <form
+            id="composer"
+            class="composer"
+            method="post"
+            action="/chat"
+            enctype="multipart/form-data"
+          >
+            <input
+              type="file"
+              id="composer-files"
+              name="files"
+              multiple
+              accept=".png,.jpg,.jpeg,.webp,.gif,.txt,.pdf,.docx,image/png,image/jpeg,image/webp,image/gif,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              hidden
+            />
+            <button
+              type="button"
+              id="composer-attach"
+              class="attach"
+              aria-label="Attach files"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
             <label class="sr-only" for="composer-input">Message</label>
             <textarea
               id="composer-input"
               name="content"
               rows="1"
               placeholder="Message the assistant…"
-              required
             ></textarea>
             <button
               type="submit"
@@ -122,7 +163,11 @@
             </button>
           </form>
           <p class="hint">
-            Enter to send · Shift+Enter for a new line · Stop to cancel a reply
+            <span class="hint-full">
+              Enter to send · Shift+Enter for a new line · Attach images or
+              documents · Stop to cancel a reply
+            </span>
+            <span class="hint-short">Tap send · Attach files</span>
           </p>
         </footer>
       </main>

@@ -1,5 +1,41 @@
 let abortController = null;
 let generationStopped = false;
+let pendingFiles = [];
+let previewUrls = new Map();
+
+const IMAGE_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+]);
+
+function setSidebarOpen(open) {
+  document.body.classList.toggle("sidebar-open", open);
+  const backdrop = document.getElementById("sidebar-backdrop");
+  if (backdrop) backdrop.hidden = !open;
+  const toggle = document.getElementById("sidebar-toggle");
+  if (toggle) {
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    toggle.setAttribute("aria-label", open ? "Close chats" : "Open chats");
+  }
+}
+
+function isDesktopLayout() {
+  return window.matchMedia("(min-width: 1024px)").matches;
+}
+
+function isCoarsePointer() {
+  return window.matchMedia("(pointer: coarse)").matches;
+}
+
+function syncAppViewport() {
+  const viewport = window.visualViewport;
+  const height = viewport?.height ?? window.innerHeight;
+  const offset = viewport?.offsetTop ?? 0;
+  document.documentElement.style.setProperty("--app-height", `${height}px`);
+  document.documentElement.style.setProperty("--app-offset", `${offset}px`);
+}
 
 function resizeComposer() {
   const ta = document.getElementById("composer-input");
@@ -21,8 +57,117 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+function fileKind(file) {
+  return IMAGE_TYPES.has(file.type) ? "image" : "document";
+}
+
+function revokePreviewUrl(file) {
+  const url = previewUrls.get(file);
+  if (url) {
+    URL.revokeObjectURL(url);
+    previewUrls.delete(file);
+  }
+}
+
+function clearPendingFiles() {
+  for (const file of pendingFiles) revokePreviewUrl(file);
+  pendingFiles = [];
+  const input = document.getElementById("composer-files");
+  if (input) input.value = "";
+  renderAttachmentPreview();
+}
+
+function renderAttachmentPreview() {
+  const container = document.getElementById("attachment-preview");
+  if (!container) return;
+
+  if (!pendingFiles.length) {
+    container.hidden = true;
+    container.innerHTML = "";
+    return;
+  }
+
+  container.hidden = false;
+  container.innerHTML = pendingFiles
+    .map((file, index) => {
+      const kind = fileKind(file);
+      const preview =
+        kind === "image"
+          ? `<img src="${previewUrls.get(file) || ""}" alt="" />`
+          : `<span class="attachment-doc-icon" aria-hidden="true">DOC</span>`;
+      return `
+        <div class="preview-item" data-index="${index}">
+          ${preview}
+          <span class="preview-name">${escapeHtml(file.name)}</span>
+          <button type="button" class="preview-remove" aria-label="Remove ${escapeHtml(file.name)}">×</button>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function addPendingFiles(fileList) {
+  const maxFiles = 5;
+  const next = [...pendingFiles];
+  for (const file of fileList) {
+    if (next.length >= maxFiles) {
+      setError(`Maximum ${maxFiles} files per message.`);
+      break;
+    }
+    if (
+      next.some(
+        (existing) =>
+          existing.name === file.name && existing.size === file.size,
+      )
+    ) {
+      continue;
+    }
+    next.push(file);
+    if (fileKind(file) === "image") {
+      previewUrls.set(file, URL.createObjectURL(file));
+    }
+  }
+  pendingFiles = next;
+  setError("");
+  renderAttachmentPreview();
+}
+
+function removePendingFile(index) {
+  const file = pendingFiles[index];
+  if (file) revokePreviewUrl(file);
+  pendingFiles = pendingFiles.filter((_, i) => i !== index);
+  renderAttachmentPreview();
+}
+
+function renderAttachmentsHtml(attachments) {
+  if (!attachments?.length) return "";
+  const items = attachments
+    .map((attachment) => {
+      if (attachment.kind === "image") {
+        const src = attachment.previewUrl || `/attachments/${attachment.id}`;
+        return `
+          <a class="attachment-image" href="${src}" target="_blank" rel="noopener">
+            <img class="attachment-thumb" src="${src}" alt="${escapeHtml(attachment.name)}" />
+          </a>
+        `;
+      }
+      const href = attachment.id ? `/attachments/${attachment.id}` : "#";
+      const download = attachment.id ? " download" : "";
+      return `
+        <a class="attachment-doc" href="${href}"${download}>
+          <span class="attachment-doc-icon" aria-hidden="true">DOC</span>
+          <span class="attachment-doc-name">${escapeHtml(attachment.name)}</span>
+        </a>
+      `;
+    })
+    .join("");
+  return `<div class="attachments">${items}</div>`;
+}
+
 function setGenerating(on) {
   document.body.classList.toggle("is-generating", on);
+  const attach = document.getElementById("composer-attach");
+  if (attach) attach.disabled = on;
 }
 
 function setError(message) {
@@ -33,15 +178,32 @@ function setError(message) {
     : "";
 }
 
-function appendUserBubble(text) {
+function appendUserBubble(text, attachments = []) {
   const messages = document.getElementById("messages");
-  if (!messages) return;
+  if (!messages) return null;
+
+  const parts = [];
+  if (text) {
+    parts.push(`<p>${escapeHtml(text).replaceAll("\n", "<br>")}</p>`);
+  }
+  parts.push(renderAttachmentsHtml(attachments));
+
   const article = document.createElement("article");
   article.className = "bubble bubble-user";
-  article.innerHTML = `<div class="bubble-body"><p>${escapeHtml(text).replaceAll("\n", "<br>")}</p></div>`;
+  article.innerHTML = `<div class="bubble-body">${parts.join("")}</div>`;
   messages.appendChild(article);
   document.getElementById("empty-state")?.classList.add("is-hidden");
   scrollTranscript();
+  return article;
+}
+
+function updateUserBubbleAttachments(article, attachments) {
+  if (!article) return;
+  const body = article.querySelector(".bubble-body");
+  if (!body) return;
+  body.querySelector(".attachments")?.remove();
+  const html = renderAttachmentsHtml(attachments);
+  if (html) body.insertAdjacentHTML("beforeend", html);
 }
 
 function appendAssistantBubble() {
@@ -145,18 +307,42 @@ function stopGenerating() {
   setGenerating(false);
 }
 
-async function sendChat(text) {
+async function sendChat(text, files = []) {
   const content = text.trim();
-  if (!content || document.body.classList.contains("is-generating")) return;
+  const hasFiles = files.length > 0;
+  if (
+    (!content && !hasFiles) ||
+    document.body.classList.contains("is-generating")
+  ) {
+    return;
+  }
 
   generationStopped = false;
   setError("");
-  appendUserBubble(content);
+
+  const localPreviewUrls = [];
+  const optimisticAttachments = files.map((file) => {
+    let previewUrl = null;
+    if (fileKind(file) === "image") {
+      previewUrl = URL.createObjectURL(file);
+      localPreviewUrls.push(previewUrl);
+    }
+    return {
+      name: file.name,
+      kind: fileKind(file),
+      previewUrl,
+    };
+  });
+
+  const userBubble = appendUserBubble(content, optimisticAttachments);
   setGenerating(true);
 
   abortController = new AbortController();
   const body = new FormData();
   body.set("content", content);
+  for (const file of files) {
+    body.append("files", file);
+  }
 
   let bodyEl = null;
   let raw = "";
@@ -192,7 +378,8 @@ async function sendChat(text) {
         const event = JSON.parse(dataLine);
         if (event.error) {
           setError(event.error);
-          bodyEl?.closest("article")?.remove();
+          userBubble?.remove();
+          for (const url of localPreviewUrls) URL.revokeObjectURL(url);
           return;
         }
         if (event.stopped || generationStopped) return;
@@ -206,8 +393,13 @@ async function sendChat(text) {
           if (!bodyEl) bodyEl = appendAssistantBubble();
           bodyEl.classList.remove("is-streaming");
           bodyEl.innerHTML = event.html;
-          if (event.thread_id && event.title)
+          if (event.attachments?.length) {
+            updateUserBubbleAttachments(userBubble, event.attachments);
+          }
+          for (const url of localPreviewUrls) URL.revokeObjectURL(url);
+          if (event.thread_id && event.title) {
             updateThreadTitle(event.thread_id, event.title);
+          }
         }
       }
     }
@@ -216,7 +408,8 @@ async function sendChat(text) {
       setError(
         "The assistant could not reply. Check your API key and try again.",
       );
-      bodyEl?.closest("article")?.remove();
+      userBubble?.remove();
+      for (const url of localPreviewUrls) URL.revokeObjectURL(url);
     }
   } finally {
     setGenerating(false);
@@ -239,7 +432,7 @@ document.addEventListener("keydown", (event) => {
     return;
   }
   if (event.target.id !== "composer-input") return;
-  if (event.key === "Enter" && !event.shiftKey) {
+  if (event.key === "Enter" && !event.shiftKey && !isCoarsePointer()) {
     event.preventDefault();
     event.target.form?.requestSubmit();
   }
@@ -249,8 +442,20 @@ document.addEventListener("click", (event) => {
   const toggle = event.target.closest("#sidebar-toggle");
   const backdrop = event.target.closest("#sidebar-backdrop");
   const edit = event.target.closest(".thread-edit");
+  const attach = event.target.closest("#composer-attach");
+  const remove = event.target.closest(".preview-remove");
+
   if (event.target.closest("#composer-stop")) {
     stopGenerating();
+    return;
+  }
+  if (attach) {
+    document.getElementById("composer-files")?.click();
+    return;
+  }
+  if (remove) {
+    const index = Number(remove.closest(".preview-item")?.dataset.index);
+    if (!Number.isNaN(index)) removePendingFile(index);
     return;
   }
   if (edit) {
@@ -259,14 +464,19 @@ document.addEventListener("click", (event) => {
     return;
   }
   if (toggle) {
-    document.body.classList.toggle("sidebar-open");
-    const el = document.getElementById("sidebar-backdrop");
-    if (el) el.hidden = !document.body.classList.contains("sidebar-open");
+    setSidebarOpen(!document.body.classList.contains("sidebar-open"));
+    return;
   }
   if (backdrop) {
-    document.body.classList.remove("sidebar-open");
-    backdrop.hidden = true;
+    setSidebarOpen(false);
+    return;
   }
+});
+
+document.addEventListener("change", (event) => {
+  if (event.target.id !== "composer-files") return;
+  addPendingFiles(Array.from(event.target.files || []));
+  event.target.value = "";
 });
 
 document.addEventListener(
@@ -283,20 +493,33 @@ document.addEventListener(
       event.preventDefault();
       const input = form.querySelector("[name=content]");
       const text = input?.value ?? "";
+      const files = form.id === "composer" ? [...pendingFiles] : [];
       if (form.id === "composer") {
         form.reset();
+        clearPendingFiles();
         resizeComposer();
       }
-      sendChat(text);
+      sendChat(text, files);
     }
   },
   true,
 );
 
 document.addEventListener("htmx:afterRequest", () => {
-  document.body.classList.remove("sidebar-open");
-  const backdrop = document.getElementById("sidebar-backdrop");
-  if (backdrop) backdrop.hidden = true;
+  setSidebarOpen(false);
 });
 
-document.addEventListener("DOMContentLoaded", scrollTranscript);
+window.addEventListener("resize", () => {
+  if (isDesktopLayout()) setSidebarOpen(false);
+  syncAppViewport();
+});
+
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", syncAppViewport);
+  window.visualViewport.addEventListener("scroll", syncAppViewport);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  syncAppViewport();
+  scrollTranscript();
+});

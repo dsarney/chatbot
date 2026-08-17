@@ -8,8 +8,9 @@ from pathlib import Path
 from uuid import uuid4
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import (
+    FileResponse,
     HTMLResponse,
     JSONResponse,
     RedirectResponse,
@@ -22,7 +23,9 @@ from openai import AsyncOpenAI
 from starlette.middleware.sessions import SessionMiddleware
 
 import store
+from files import UploadError, resolve_attachment, save_uploads
 from format_message import format_message
+from openai_messages import build_openai_messages
 
 load_dotenv()
 
@@ -135,21 +138,48 @@ def index(request: Request):
     return templates.TemplateResponse(request, "index.html", page_context(request))
 
 
+@app.get("/attachments/{attachment_id}")
+def get_attachment(request: Request, attachment_id: str):
+    session_id = get_session_id(request)
+    entry = resolve_attachment(session_id, attachment_id)
+    if entry is None:
+        return Response(status_code=404)
+    return FileResponse(
+        entry["path"],
+        media_type=entry["mime"],
+        filename=entry["name"],
+    )
+
+
 @app.post("/chat")
-async def chat(request: Request, content: str = Form("")):
+async def chat(
+    request: Request,
+    content: str = Form(""),
+    files: list[UploadFile] | None = File(None),
+):
     session_id = get_session_id(request)
     text = content.strip()
-    if not text:
+    upload_files = files or []
+
+    if not text and not upload_files:
         return StreamingResponse(
-            iter([sse({"error": "Write a message before sending."})]),
+            iter([sse({"error": "Write a message or attach a file before sending."})]),
+            media_type="text/event-stream",
+        )
+
+    try:
+        attachments = await save_uploads(session_id, upload_files)
+    except UploadError as exc:
+        return StreamingResponse(
+            iter([sse({"error": str(exc)})]),
             media_type="text/event-stream",
         )
 
     await cancel_inflight(session_id)
-    store.append_user_message(session_id, text)
+    store.append_user_message(session_id, text, attachments or None)
     thread = store.current_thread(session_id)
     thread_id = thread.id
-    messages = list(thread.messages)
+    messages = build_openai_messages(thread.messages, session_id)
     inflight = InFlight()
     _inflight[session_id] = inflight
 
@@ -194,6 +224,7 @@ async def chat(request: Request, content: str = Form("")):
                     "html": format_message(reply),
                     "title": title,
                     "thread_id": thread_id,
+                    "attachments": attachments,
                 }
             )
         except asyncio.CancelledError:

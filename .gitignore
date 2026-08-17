@@ -219,5 +219,8 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# Uploaded chat attachments (session-local)
+uploads/
+
 # OS System Files 
 .DS_Store
